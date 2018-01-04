@@ -5,11 +5,23 @@
 #include "util.h"
 
 enum class WindowEvent {
+  Unknown,
   ArrowUp,
   ArrowDown,
   ArrowLeft,
   ArrowRight,
 };
+
+inline std::string to_string(WindowEvent ev){
+  switch (ev){
+    case WindowEvent::Unknown: default: return "Unknown";
+      
+    case WindowEvent::ArrowUp:    return "ArrowUp";
+    case WindowEvent::ArrowDown:  return "ArrowDown";
+    case WindowEvent::ArrowLeft:  return "ArrowLeft";
+    case WindowEvent::ArrowRight: return "ArrowRight";
+  }
+}
 
 #ifdef NO_WINDOW
 

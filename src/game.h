@@ -21,12 +21,13 @@ class Game {
 public:
   Game(Window& window);
   void setup();
-  void queueEvent(const EvAny& ev);
+  void queueEvent(const EvAny& ev);  
   bool update();
   void render();
   
   vec2i worldCoord(vec2i screenCoord) const; // Map screen point to world point
   vec2i screenCoord(vec2i worldCoord) const; // Map world point to screen point
+  bool onScreen(vec2i worldCoord) const;
   
   char& groundTile(vec2i p){
     vec2i q {p.x - worldBounds.left, worldBounds.top - p.y};
@@ -37,7 +38,8 @@ public:
   Window& window;
   recti worldBounds {-32, 13, 64, 26};
   ident player {invalid_id};
-  vec2i camera {0, 0};
+  vec2i cameraPosition {0, 0};
+  vec2i cameraTarget {0, 0};
   
   bool cameraShake = false;
   int cameraShakeTimer = 0;
@@ -57,7 +59,7 @@ protected:
   std::array<std::vector<EvAny>, 2> events_ {};
   int eventsIndex_ = 0;
 
-  std::deque<std::pair<std::string, int>> eventLog_;
+  std::deque<std::pair<std::string, int>> log_;
   
   Array2D<char> groundTiles_;
   
@@ -74,13 +76,16 @@ protected:
 
   void sync();
   void handleInput();
-  void handlePlayerInput();
+  void updatePlayer();
   void updateCamera();
+  
+  void log(const std::string message);
   
   // Factories
   Sprite& createSprite(std::string frames, bool animated, int frameRate, uint16_t fg, uint16_t bg, vec2i position, RenderLayer layer);
   Mob& createMob(MobType type, vec2i position);
   void createBloodSplatter(vec2i position);
+  void createBones(char c, vec2i position);
   
 };
 

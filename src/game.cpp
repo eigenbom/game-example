@@ -11,7 +11,8 @@ void Game::setup(){
   // Create player
   auto& playerMob = createMob(MobType::Player, {0,0});
   player = playerMob.entity;
-  camera = playerMob.position;
+  cameraTarget   = playerMob.position;
+  cameraPosition = playerMob.position;
   
   // Setup terrain
   groundTiles_.fill('.');
@@ -62,7 +63,7 @@ bool Game::update(){
   handleInput();
   updateCamera(); // NB: Outside of world update
   
-  const int subTicksPerTick = 3;
+  const int subTicksPerTick = 1;
   if (subTick_-- == 0){
     subTick_ = subTicksPerTick;
   
@@ -70,7 +71,7 @@ bool Game::update(){
     bool updateWorld = (freezeTimer == 0);
 
     if (updateWorld){
-      handlePlayerInput();
+      updatePlayer();
       
       for (auto* sys: systems_){
         sys->update();
@@ -89,16 +90,17 @@ bool Game::update(){
         if (c == '_' && randInt(0, 60) == 0) c = '.';
       }
     }
-      
     
-  
     // Events
     auto& events = events_[eventsIndex_];
     eventsIndex_ = 1 - eventsIndex_; // toggle buffer
     std::vector<ident> remove;
     
     for (const EvAny& any: events){
-      eventLog_.push_back({to_string(any), tick_});
+      const bool logEvents = false;
+      if (logEvents){
+        log(to_string(any));
+      }
       
       if (any.is<EvRemove>()){
         const auto& ev = any.get<EvRemove>();
@@ -111,20 +113,15 @@ bool Game::update(){
         auto& sprite = sprites[e.sprite];
         queueEvent(EvRemove { mob.entity });
 
-        // TODO: screen-shake only if visible
-        cameraShake = true;
-        cameraShakeTimer = 0;
-        cameraShakeStrength = 2;
-        freezeTimer = 1;
+        if (onScreen(mob.position)){
+          cameraShake = true;
+          cameraShakeTimer = 0;
+          cameraShakeStrength = 2;
+          freezeTimer = 1;
+        }
         
         createBloodSplatter(mob.position);
-        
-        {
-          // Bones
-          auto& spr = createSprite(std::string(1, sprite.frames[sprite.frame]), false, 0, TB_RED, TB_BLACK, mob.position, RenderLayer::Ground);
-          auto& e = entities[spr.entity];
-          e.life = randInt(100, 110);
-        }
+        createBones(sprite.frames[sprite.frame], mob.position);
       }
       else if (any.is<EvSpawnMob>()){
         const auto& ev = any.get<EvSpawnMob>();
@@ -141,24 +138,26 @@ bool Game::update(){
           const vec2i margin { 8, 4 };
           vec2i newScreenPos = screenCoord(ev.to);
           if ((window.width() - newScreenPos.x) < margin.x){
-            camera.x += margin.x;
+            cameraTarget.x += margin.x;
           }
           else if (newScreenPos.x < margin.x){
-            camera.x -= margin.x;
+            cameraTarget.x -= margin.x;
           }
           else if ((window.height() - newScreenPos.y) < margin.y){
-            camera.y -= margin.y;
+            cameraTarget.y -= margin.y;
           }
           else if (newScreenPos.y < margin.y){
-            camera.y += margin.y;
+            cameraTarget.y += margin.y;
           }
         }
       }
       else if (any.is<EvAttack>()){
-        cameraShake = true;
-        cameraShakeTimer = 0;
-        cameraShakeStrength = 1;
-        freezeTimer = 0;
+        const auto& ev = any.get<EvAttack>();
+        if (onScreen(mobs[ev.target].position)){
+          cameraShake = true;
+          cameraShakeTimer = 0;
+          cameraShakeStrength = 1;
+        }
       }
       
       for (auto* sys: systems_){
@@ -218,10 +217,10 @@ bool Game::update(){
     sync();
     tick_++;
     
-    while (!eventLog_.empty()){
-      const auto& pair = eventLog_.front();
+    while (!log_.empty()){
+      const auto& pair = log_.front();
       if (tick_ > pair.second + 20){
-        eventLog_.pop_front();
+        log_.pop_front();
       }
       else break;
     }
@@ -234,22 +233,28 @@ void Game::render(){
   window.clear();
   renderSystem_.render();
   
-  const bool logEvents = false;
-  if (logEvents){
-  // Render event log
+  const bool showLog = true;
+  if (showLog){
 #ifdef NO_WINDOW
-    for (const auto& ev: eventLog_){
+    for (const auto& ev: log_){
       std::cout << ev.first << "\n";
     }
 #else
+    const int maxMessages = 10;
     int y = 0;
-    for (const auto& ev: eventLog_){
-      for (int x = 0; x < std::min(30, (int)ev.first.size()); x++){
-        window.set(x, y, ev.first[x], TB_WHITE, TB_BLUE);
+    for (const auto& message: log_){
+      auto tick = std::to_string(message.second);
+      for (int x = 0; x < (int) tick.size(); x++){
+        window.set(x, y, tick[x], TB_WHITE, TB_BLUE);
+      }
+      for (int x = (int) tick.size(); x < 6; x++){
+        window.set(x, y, ' ', TB_WHITE, TB_BLUE);
+      }
+      for (int x = 0; x < (int) message.first.size(); x++){
+        window.set(6 + x, y, message.first[x], TB_WHITE, TB_BLUE);
       }
       y++;
-      
-      if (y > 5) break;
+      if (y > maxMessages) break;
     }
 #endif
   }
@@ -258,15 +263,21 @@ void Game::render(){
 vec2i Game::worldCoord(vec2i screenCoord) const {
   const vec2i ws { window.width(), window.height() };
   vec2i q = screenCoord - ws / 2;
-  vec2i camFinal = camera + (cameraShake ? cameraShakeOffset : vec2i {0, 0});
+  vec2i camFinal = cameraPosition + (cameraShake ? cameraShakeOffset : vec2i {0, 0});
   return { q.x + camFinal.x, -(q.y - camFinal.y) };
 }
 
 vec2i Game::screenCoord(vec2i worldCoord) const {
   const vec2i ws { window.width(), window.height() };
   vec2i wc = worldCoord;
-  vec2i camFinal = camera + (cameraShake ? cameraShakeOffset : vec2i {0, 0});
+  vec2i camFinal = cameraPosition + (cameraShake ? cameraShakeOffset : vec2i {0, 0});
   return vec2i {wc.x - camFinal.x, camFinal.y - wc.y} + ws / 2;
+}
+
+bool Game::onScreen(vec2i worldCoord) const {
+  vec2i sc = screenCoord(worldCoord);
+  recti windowBounds {0, window.height()-1, window.width(), window.height() };
+  return windowBounds.contains(sc);
 }
 
 void Game::queueEvent(const EvAny &ev){
@@ -278,6 +289,10 @@ void Game::sync(){
   mobs.sync();
   sprites.sync();
   physics.sync();
+}
+
+void Game::log(const std::string message){
+  log_.push_back({message, tick_});
 }
 
 Sprite& Game::createSprite(std::string frames, bool animated, int frameRate, uint16_t fg, uint16_t bg, vec2i position, RenderLayer renderLayer){
@@ -379,21 +394,48 @@ void Game::createBloodSplatter(vec2i position){
   }
 }
 
+void Game::createBones(char c, vec2i position){
+  auto& spr = createSprite(std::string(1, c), false, 0, TB_RED, TB_BLACK, position, RenderLayer::Ground);
+  auto& e = entities[spr.entity];
+  e.life = randInt(100, 110);
+}
+
 void Game::handleInput(){
   for (auto ev: window.events()){
-    windowEvents_.push_back(ev);
+    bool isPlayerMove = [ev](){
+      switch (ev){
+        case WindowEvent::ArrowUp:
+        case WindowEvent::ArrowDown:
+        case WindowEvent::ArrowLeft:
+        case WindowEvent::ArrowRight:
+          return true;
+        default:
+          return false;
+      }
+    }();
+    
+    if (!isPlayerMove || windowEvents_.size() < 2){
+      // log(to_string(ev));
+      windowEvents_.push_back(ev);
+    }
   }
 }
 
-void Game::handlePlayerInput(){
+void Game::updatePlayer(){
+  auto& entity = entities[player];
+  auto& mob    = mobs[entity.mob];
+  
+  mob.tick += mob.info->speed;
+  mob.tick = std::min(mob.tick, 2 * Mob::TicksPerAction - 1);
+  
   // Map input to player commands
   vec2i movePlayer {0, 0};
   
   while (!windowEvents_.empty()){
     const auto& ev = windowEvents_.front();
-    windowEvents_.pop_front();
-    
     switch (ev){
+      default:
+        break;
       case WindowEvent::ArrowUp:
         movePlayer = vec2i {0, 1};
         break;
@@ -407,11 +449,22 @@ void Game::handlePlayerInput(){
         movePlayer = vec2i {1, 0};
         break;
     }
+    
+    // A move requires a full action
+    if (movePlayer != vec2i {0, 0}){
+      if (mob.tick >= Mob::TicksPerAction){
+        windowEvents_.pop_front();
+        mob.tick -= Mob::TicksPerAction;
+        break;
+      }
+      else {
+        // Can't move yet
+        return;
+      }
+    }
   }
   
   if (movePlayer != vec2i {0, 0}){
-    auto& entity = entities[player];
-    auto& mob = mobs[entity.mob];
     vec2i oldPos = mob.position;
     vec2i newPos = oldPos + movePlayer;
     
@@ -455,6 +508,13 @@ void Game::updateCamera() {
         cameraShakeOffset = vec2i {randInt(-1, 1), randInt(-1, 1)};
       }
     }
+  }
+  
+  if (cameraPosition != cameraTarget){
+    vec2i dc = cameraTarget - cameraPosition;
+    int dx = sign(dc.x);
+    int dy = sign(dc.y);
+    cameraPosition += vec2i {dx, dy};
   }
 }
 

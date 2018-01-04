@@ -51,20 +51,24 @@ inline std::string to_string(MobType type){
 struct MobInfo {
   MobCategory category { MobCategory::Unknown };
   std::string name {};
-  int32_t health = 0;
-  bool attacks = false;
+  int32_t health   = 0;
+  bool attacks     = false;
   int32_t strength = 0;
+  int32_t speed    = 4; // 1 = slowest, 10 = fastest
 };
 
 class Mob: public Component {
 public:
+  static const int TicksPerAction = 10;
+  
   Mob() = default;
   Mob(const MobInfo* info):info{info}{}
   const MobInfo* info { &sMobInfo };
   
   vec2i position {0, 0};
   int32_t health {0};
-
+  int32_t tick {0};
+  
   // type-specific data
   vec2i dir {0, 1};
   

@@ -189,7 +189,6 @@ protected:
 };
 
 
-
 // Mathematics
 
 template <typename T>
@@ -228,6 +227,13 @@ template <typename T>
 inline std::string to_string(const vec2<T>& vec){
   using namespace std::string_literals;
   return "{"s + std::to_string(vec.x) + ", "s + std::to_string(vec.y) + "}"s;
+}
+
+template <typename T>
+T sign(T t){
+  if (t > 0) return 1;
+  else if (t < 0) return -1;
+  else return 0;
 }
 
 // Helpful containers

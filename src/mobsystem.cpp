@@ -6,127 +6,47 @@
 #include <string>
 using namespace std::string_literals;
 
-MobInfo MI(MobCategory category, std::string name, int32_t health){
+MobInfo MI(MobCategory category, std::string name, int32_t health, int32_t speed){
   MobInfo mi;
   mi.category = category;
   mi.name = name;
   mi.health = health;
+  mi.speed = speed;
   return mi;
 }
 
-MobInfo MI(MobCategory category, std::string name, int32_t health, int32_t strength){
+MobInfo MI(MobCategory category, std::string name, int32_t health, int32_t speed, int32_t strength){
   MobInfo mi;
   mi.category = category;
   mi.name = name;
   mi.health = health;
+  mi.speed = speed;
   mi.attacks = true;
   mi.strength = strength;
   return mi;
 }
 
 const std::unordered_map<MobType, MobInfo> MobDatabase {
-  { MobType::Unknown,    MI( MobCategory::Unknown, "Unknown"s, 0 ) },
-  { MobType::Rabbit,     MI( MobCategory::Rabbit,  "Rabbit"s, 1 ) },
-  { MobType::RabbitWere, MI( MobCategory::Rabbit,  "Were-Rabbit"s, 1, 1 ) },
-  { MobType::Snake,      MI( MobCategory::Snake,   "Snake"s, 1 ) },
-  { MobType::OrcWeak,    MI( MobCategory::Orc,     "Little Orc"s, 5, 3 ) },
-  { MobType::OrcStrong,  MI( MobCategory::Orc,     "Big Orc"s, 6, 5 ) },
-  { MobType::Player,     MI( MobCategory::Player,  "Player"s, 5, 5 ) },
+  { MobType::Unknown,    MI( MobCategory::Unknown, "Unknown"s,     0, 1    ) },
+  { MobType::Rabbit,     MI( MobCategory::Rabbit,  "Rabbit"s,      1, 7    ) },
+  { MobType::RabbitWere, MI( MobCategory::Rabbit,  "Were-Rabbit"s, 1, 6, 1 ) },
+  { MobType::Snake,      MI( MobCategory::Snake,   "Snake"s,       1, 5    ) },
+  { MobType::OrcWeak,    MI( MobCategory::Orc,     "Little Orc"s,  5, 3, 3 ) },
+  { MobType::OrcStrong,  MI( MobCategory::Orc,     "Big Orc"s,     6, 2, 5 ) },
+  { MobType::Player,     MI( MobCategory::Player,  "Player"s,      5, 4, 5 ) },
 };
 
 void MobSystem::update(){
-  static int movementTimer = 0;
-  movementTimer++;
-  
-  bool moveQuick  = movementTimer % 2 == 0;
-  bool moveMedium = movementTimer % 3 == 0;
-  bool moveSlow   = movementTimer % 8 == 0;
-  
-  const int margin = 6; // min distance from edge mobs prefer to be
-  auto dirToNearestEdge = [&](vec2i pos) -> vec2i {
-    const auto& b = game_.worldBounds;
-    
-    if (pos.y > b.top - margin) return {0, -1};
-    else if (pos.y < b.top - b.height + margin) return {0, 1};
-    else if (pos.x < b.left + margin) return {1, 0};
-    else if (pos.x > b.left + b.width - margin) return {-1, 0};
-    return {0, 0};
-  };
-  
   for (auto& mob: game_.mobs.values()){
-    auto& e = game_.entities[mob.entity];
-    auto& sprite = game_.sprites[e.sprite];
+    if (mob.info->category == MobCategory::Player) continue;
     
-    vec2i pos = mob.position;
-    auto& info = *mob.info;
-    
-    if (info.category == MobCategory::Player) continue;
-    
-    if (info.attacks){
-      // Try attack if nearby player
+    mob.tick += mob.info->speed;
+    mob.tick = std::min(mob.tick, 2 * Mob::TicksPerAction - 1);
+    if (mob.tick >= Mob::TicksPerAction){
+      auto& e = game_.entities[mob.entity];
+      updateMob(e, mob);
+      mob.tick -= Mob::TicksPerAction;
     }
-    
-    switch (info.category){
-      case MobCategory::Rabbit: {
-        if (moveQuick){
-          if (randInt(0, 500) == 0){
-            game_.queueEvent(EvSpawnMob { MobType::Rabbit, pos });
-          }
-          else {
-            // Move randomly
-            vec2i dir = dirToNearestEdge(pos);
-            if (dir == vec2i{0,0}){
-              dir = vec2i {randInt(-1, 1), randInt(-1, 1)};
-            }
-            game_.queueEvent(EvTryWalk { mob.id, mob.position, mob.position + dir } );
-          }
-        }
-        break;
-      }
-      case MobCategory::Snake: {
-        if (moveMedium){
-          if (randInt(0, 6) == 0){
-            if (mob.dir.x != 0){
-              mob.dir = choose<vec2i>({{0, 1}, {0, -1}});
-            }
-            else {
-              mob.dir = choose<vec2i>({{1, 0}, {-1, 0}});
-            }
-            
-            vec2i dir = dirToNearestEdge(pos);
-            if (dir != vec2i{0,0}) mob.dir = dir;
-          }
-          else {
-            if (mob.dir.y == 1) sprite.frame = 0;
-            else if (mob.dir.y == -1) sprite.frame = 1;
-            else if (mob.dir.x == 1) sprite.frame = 2;
-            else if (mob.dir.x == -1) sprite.frame = 3;
-            
-            game_.queueEvent(EvTryWalk { mob.id, mob.position, mob.position + mob.dir } );
-          }
-        }
-        break;
-      }
-      case MobCategory::Orc: {
-        if (moveSlow){
-          if (randInt(0, 2) == 0){
-            game_.groundTile(mob.position) = choose({'_','_'});
-          }
-          
-          vec2i dir = dirToNearestEdge(pos);
-          if (dir == vec2i{0,0}){
-            // move randomly
-            dir = (randInt(0, 1) == 0) ? vec2i{randInt(-1, 1), 0} : vec2i{0, randInt(-1, 1)};
-          }
-          game_.queueEvent(EvTryWalk { mob.id, mob.position, mob.position + dir } );
-        }
-        break;
-      }
-      default: break;
-    }
-    
-    // Mob overrides sprite position
-    sprite.position = mob.position;
   }
 }
 
@@ -134,7 +54,6 @@ void MobSystem::handleEvent(const EvAny& any) {
   if (any.is<EvTryWalk>()){
     const auto& ev = any.get<EvTryWalk>();
     auto& mob = game_.mobs[ev.mob];
-    
     auto& info = *mob.info;
     
     // check position is clear
@@ -208,3 +127,83 @@ void MobSystem::handleEvent(const EvAny& any) {
     }
   }
 }
+
+void MobSystem::updateMob(Entity& e, Mob& mob){
+  auto& info = *mob.info;
+  auto& sprite = game_.sprites[e.sprite];
+  vec2i pos = mob.position;
+  
+  const int margin = 6; // min distance from edge mobs prefer to be
+  auto dirToNearestEdge = [&](vec2i pos) -> vec2i {
+    const auto& b = game_.worldBounds;
+    
+    if (pos.y > b.top - margin) return {0, -1};
+    else if (pos.y < b.top - b.height + margin) return {0, 1};
+    else if (pos.x < b.left + margin) return {1, 0};
+    else if (pos.x > b.left + b.width - margin) return {-1, 0};
+    return {0, 0};
+  };
+  
+  switch (info.category){
+    case MobCategory::Rabbit: {
+      if (randInt(0, 500) == 0){
+        game_.queueEvent(EvSpawnMob { MobType::Rabbit, pos });
+      }
+      else {
+        // Move randomly
+        vec2i dir = dirToNearestEdge(pos);
+        if (dir == vec2i{0,0}){
+          dir = vec2i {randInt(-1, 1), randInt(-1, 1)};
+        }
+        game_.queueEvent(EvTryWalk { mob.id, pos, pos + dir } );
+      }
+      break;
+    }
+    case MobCategory::Snake: {
+      if (randInt(0, 6) == 0){
+        if (mob.dir.x != 0){
+          mob.dir = choose<vec2i>({{0, 1}, {0, -1}});
+        }
+        else {
+          mob.dir = choose<vec2i>({{1, 0}, {-1, 0}});
+        }
+        
+        vec2i dir = dirToNearestEdge(pos);
+        if (dir != vec2i{0,0}) mob.dir = dir;
+      }
+      else {
+        if (mob.dir.y == 1) sprite.frame = 0;
+        else if (mob.dir.y == -1) sprite.frame = 1;
+        else if (mob.dir.x == 1) sprite.frame = 2;
+        else if (mob.dir.x == -1) sprite.frame = 3;
+        
+        game_.queueEvent(EvTryWalk { mob.id, pos, pos + mob.dir } );
+      }
+      break;
+    }
+    case MobCategory::Orc: {
+      if (randInt(0, 2) == 0){
+        game_.groundTile(pos) = choose({'_','_'});
+      }
+      
+      vec2i dir = dirToNearestEdge(pos);
+      if (dir == vec2i{0,0}){
+        if (randInt(0, 3) == 0){
+          // stay here
+        }
+        else {
+          // move randomly
+          int32_t move = choose({-1, 1});
+          dir = choose({vec2i{move, 0}, vec2i{0, move}});
+        }
+      }
+      
+      if (dir != vec2i{0,0}){
+        game_.queueEvent(EvTryWalk { mob.id, pos, pos + dir } );
+      }
+      break;
+    }
+    default: break;
+  }
+}
+

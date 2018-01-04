@@ -38,6 +38,12 @@ EM_BOOL emsKeyDownCallback(int eventType, const EmscriptenKeyboardEvent* e, void
 }
 
 extern "C" {
+    void EMSCRIPTEN_KEEPALIVE _setWindowSize(int width, int height){
+      if (window != nullptr){
+        window->setSize(width, height);
+      }
+    }
+
     void EMSCRIPTEN_KEEPALIVE _setup()  { 
       emscripten_set_keydown_callback(nullptr, nullptr, true, emsKeyDownCallback);
 

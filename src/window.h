@@ -44,11 +44,15 @@ public:
 
 #ifdef __EMSCRIPTEN__
   EM_BOOL emsKeyDownCallback(int eventType, const EmscriptenKeyboardEvent* e, void* userData);
-protected:
+  void setSize(int width, int height);
+
+private:
   std::vector<WindowEvent> eventsBuffer_;
+  int width_ {60};
+  int height_ {60};
 #endif
 
-protected:
+private:
   std::vector<WindowEvent> events_;
 };
 

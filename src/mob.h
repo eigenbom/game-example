@@ -59,7 +59,11 @@ struct MobInfo {
 
 class Mob: public Component {
 public:
+#ifdef __EMSCRIPTEN__
+  static const int TicksPerAction = 30;
+#else
   static const int TicksPerAction = 15;
+#endif
   
   Mob() = default;
   Mob(const MobInfo* info):info{info}{}

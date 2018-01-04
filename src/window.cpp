@@ -71,6 +71,11 @@ EM_BOOL Window::emsKeyDownCallback(int eventType, const EmscriptenKeyboardEvent*
   return false;
 }
 
+void Window::setSize(int w, int h){
+  width_  = w;
+  height_ = h;
+}
+
 void Window::render(){
   EM_ASM(Module.flush());
 }
@@ -106,11 +111,11 @@ void Window::set(int x, int y, char ch, uint16_t fg_, uint16_t bg_){
 }
 
 int32_t Window::width() const {
-  return 60;
+  return width_;
 }
 
 int32_t Window::height() const {
-  return 40;
+  return height_;
 }
 
 #else // Terminal

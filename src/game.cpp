@@ -64,8 +64,8 @@ bool Game::update(){
   updateCamera(); // NB: Outside of world update
   
   // Use this to slow down the world update
-  const int subTicksPerTick = 1;
-  if (subTick_-- == 0){
+  const int subTicksPerTick = 2;
+  if (--subTick_ <= 0){
     subTick_ = subTicksPerTick;
   
     if (freezeTimer > 0) freezeTimer--;
@@ -259,10 +259,26 @@ void Game::render(){
     }
 #endif
   }
+
+  std::string header = "Some Roguelike Thing";
+  for (int x = 0; x < (int) header.size(); x++){
+    window.set(x, 0, header[x], TB_WHITE, TB_BLUE);
+  }
+  for (int x = (int) header.size(); x < window.width(); x++){
+    window.set(x, 0, ' ', TB_WHITE, TB_BLUE);
+  }
   
-  std::string message = "ESC: Exit. Arrows: Move.";
-  for (int x = 0; x < (int) message.size(); x++){
-    window.set(x, window.height()-1, message[x], TB_WHITE, TB_BLUE);
+#ifdef __EMSCRIPTEN__
+  std::string footer = "Arrows: Move. Code: https://github.com/eigenbom/game-example.";
+#else
+  std::string footer = "ESC: Exit. Arrows: Move.";
+#endif
+
+  for (int x = 0; x < (int) footer.size(); x++){
+    window.set(x, window.height()-1, footer[x], TB_WHITE, TB_BLUE);
+  }
+  for (int x = (int) footer.size(); x < window.width(); x++){
+    window.set(x, 0, ' ', TB_WHITE, TB_BLUE);
   }
 }
 
@@ -517,10 +533,14 @@ void Game::updateCamera() {
   }
   
   if (cameraPosition != cameraTarget){
-    vec2i dc = cameraTarget - cameraPosition;
-    int dx = sign(dc.x);
-    int dy = sign(dc.y);
-    cameraPosition += vec2i {dx, dy};
+    static int cameraTick_ = 0;
+    if (cameraTick_++ >= 1){
+      cameraTick_ = 0;
+      vec2i dc = cameraTarget - cameraPosition;
+      int dx = sign(dc.x);
+      int dy = sign(dc.y);
+      cameraPosition += vec2i {dx, dy};
+    }
   }
 }
 

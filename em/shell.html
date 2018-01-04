@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>roguelike example</title>
+    <title>some roguelike thing</title>
     <script src="curses.js"></script>
     <style>
         .fullscreen {
@@ -13,12 +13,12 @@
             left: 0;
             bottom: 0;
             right: 0;
-            overflow: auto;
-            background: black;
+            overflow: hidden;
+            background: black;            
         }
 
         .terminal {
-            width: 100%;
+            /* width: 100%; */
         }
         
         .emscripten {
@@ -46,21 +46,20 @@
 
 <body>
     <div class="emscripten" id="status">Downloading...</div>
-    <div class="fullscreen">
-        <canvas class="terminal" width='1080px' height='720px' id="terminal"></canvas>
-    </div>
-    <script type='text/javascript'>
-        //https://gist.github.com/adamnew123456/bc547952babf4b33d520
-        var root = null;
+    <div class="fullscreen"><canvas class="terminal" id="terminal"></canvas></div>
+    <script type='text/javascript'>        
         var statusElement = document.getElementById('status');
+        var terminal = document.getElementById('terminal');
+        var terminalWidth = 60;
+        var terminalHeight = 40;
+        var root = RootWindow(terminal, terminalWidth, terminalHeight, 'Courier New');
         var Module = {
             preRun: [],
-            postRun: function(){
-                root = RootWindow(document.getElementById('terminal'), 60, 40, 'Courier New');
-            },
-            onRuntimeInitialized: function() {                
+            postRun: function(){},
+            onRuntimeInitialized: function() {
                 Module.__setup();
-                window.setInterval(Module.__update, 15);
+                resize();
+                window.setInterval(Module.__update, 15);                
             },
             clear: function() {
                 root.clear();
@@ -69,7 +68,6 @@
             set_ch: function(x, y, ch){
                 root.move(x, y);
                 root.set_ch(ch, x, y);
-                // console.log(x, y, ch);
                 root.refresh();
             },
             set_char_and_colour: function(x, y, ch, fg1, fg2, fg3, bg1, bg2, bg3){
@@ -121,6 +119,19 @@
                 if (text) Module.printErr('[post-exception status] ' + text);
             };
         };
+        function resize(){
+            terminal.width  = window.innerWidth;
+            terminal.height = window.innerHeight;
+            var aspect = (1.0 * terminal.width) / terminal.height;
+            if (terminal.height < 300) terminalHeight = 15;
+            else if (terminal.height < 600) terminalHeight = 25;
+            else terminalHeight = 35;            
+            terminalWidth = Math.floor(aspect * terminalHeight);
+            var font_size = Math.floor(terminal.height / (terminalHeight * 0.9));
+            root = RootWindow(terminal, terminalWidth, terminalHeight, 'Courier New', font_size);
+            Module.__setWindowSize(terminalWidth, terminalHeight);
+        };
+        window.addEventListener("resize", resize);
 
     </script> {{{ SCRIPT }}}
 </body>

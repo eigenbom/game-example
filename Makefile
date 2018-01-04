@@ -10,6 +10,7 @@ OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
 DEPS := $(OBJS:.o=.d)
 
 INC_DIRS := $(shell find $(SRC_DIRS) -type d)
+INCS := $(shell find $(INC_DIRS) -name *.h)
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
 CPPFLAGS := $(INC_FLAGS) -MMD -MP
@@ -30,7 +31,7 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 # emscripten
-$(HTML_DIR)/index.html: $(SRCS_CPP) em/curses.js em/shell.html
+$(HTML_DIR)/index.html: $(SRCS_CPP) $(INCS) em/curses.js em/shell.html
 	$(MKDIR_P) html
 	emcc $(SRCS_CPP) -std=c++14 -s WASM=1 -O2 $(INC_FLAGS) -o $@ --shell-file em/shell.html
 	cp -f em/curses.js $(HTML_DIR)/curses.js

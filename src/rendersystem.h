@@ -46,13 +46,20 @@ public:
 class Game;
 class RenderSystem: public System {
 public:
-  RenderSystem(Game& game):game_(game){}
+  RenderSystem(Game& game);
   void update() final;
   void handleEvent(const EvAny&) final {}
 
   void render();
+  
+protected:
+  void renderGround();
+  void renderOcean();
+  
 protected:
   Game& game_;
+  int32_t tick_ = 0;
+  Array2D<int32_t> randomArray2D_;
 };
 
 #endif /* rendersystem_hpp */

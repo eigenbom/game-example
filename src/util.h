@@ -250,21 +250,38 @@ public:
     data_.shrink_to_fit();
   }
   
+  int width() const {
+    return width_;
+  }
+  
+  int height() const {
+    return height_;
+  }
+  
   void fill(T val){
     std::fill(data_.begin(), data_.end(), val);
   }
   
-  T& operator()(vec2i p){
-    return inBounds(p) ? data_[p.x + p.y * width_]: nullVal_;
+  T& operator()(int x, int y){
+    return inBounds(x, y) ? data_[x + y * width_]: nullVal_;
   }
   
-  const T& operator()(vec2i p) const {
-    return inBounds(p) ? data_[p.x + p.y * width_]: nullVal_;
+  T& operator()(vec2i p){ return (*this)(p.x, p.y); }
+  
+  const T& operator()(int x, int y) const {
+    return inBounds(x, y) ? data_[x + y * width_]: nullVal_;
+  }
+  
+  const T& operator()(vec2i p) const { return (*this)(p.x, p.y); }
+  
+  bool inBounds(int x, int y) const {
+    return x >= 0 && x < width_ && y >= 0 && y < height_;
   }
   
   bool inBounds(vec2i p) const {
     return p.x >= 0 && p.x < width_ && p.y >=0 && p.y < height_;
   }
+  
   // Raw data access
   std::vector<T>& data() { return data_; }
   

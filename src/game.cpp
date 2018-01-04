@@ -27,7 +27,7 @@ void Game::setup(){
   // Populate world with mobs
   int numMobs = (int) (0.5 * sqrt(b.width * b.height));
   for (int i=0; i<numMobs; i++){
-    MobType type = choose({MobType::Rabbit, MobType::OrcStrong}); //MobType::Snake, MobType::OrcStrong});
+    MobType type = choose({MobType::Rabbit, MobType::OrcStrong, MobType::Snake});
     vec2i pos {
       randInt(b.left, b.left + b.width - 1),
       randInt(b.top - b.height + 1, b.top)
@@ -63,6 +63,7 @@ bool Game::update(){
   handleInput();
   updateCamera(); // NB: Outside of world update
   
+  // Use this to slow down the world update
   const int subTicksPerTick = 1;
   if (subTick_-- == 0){
     subTick_ = subTicksPerTick;
@@ -258,6 +259,11 @@ void Game::render(){
     }
 #endif
   }
+  
+  std::string message = "ESC: Exit. Arrows: Move.";
+  for (int x = 0; x < (int) message.size(); x++){
+    window.set(x, window.height()-1, message[x], TB_WHITE, TB_BLUE);
+  }
 }
 
 vec2i Game::worldCoord(vec2i screenCoord) const {
@@ -414,7 +420,7 @@ void Game::handleInput(){
       }
     }();
     
-    if (!isPlayerMove || windowEvents_.size() < 2){
+    if (!isPlayerMove || windowEvents_.size() < 1){
       // log(to_string(ev));
       windowEvents_.push_back(ev);
     }

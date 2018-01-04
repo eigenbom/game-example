@@ -33,7 +33,7 @@ const std::unordered_map<MobType, MobInfo> MobDatabase {
   { MobType::Snake,      MI( MobCategory::Snake,   "Snake"s,       1, 5    ) },
   { MobType::OrcWeak,    MI( MobCategory::Orc,     "Little Orc"s,  5, 3, 3 ) },
   { MobType::OrcStrong,  MI( MobCategory::Orc,     "Big Orc"s,     6, 2, 5 ) },
-  { MobType::Player,     MI( MobCategory::Player,  "Player"s,      5, 4, 5 ) },
+  { MobType::Player,     MI( MobCategory::Player,  "Player"s,      5, 6, 3 ) },
 };
 
 void MobSystem::update(){
@@ -147,7 +147,8 @@ void MobSystem::updateMob(Entity& e, Mob& mob){
   switch (info.category){
     case MobCategory::Rabbit: {
       if (randInt(0, 500) == 0){
-        game_.queueEvent(EvSpawnMob { MobType::Rabbit, pos });
+        // Too many rabbits!
+        // game_.queueEvent(EvSpawnMob { MobType::Rabbit, pos });
       }
       else {
         // Move randomly

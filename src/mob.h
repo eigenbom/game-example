@@ -59,7 +59,7 @@ struct MobInfo {
 
 class Mob: public Component {
 public:
-  static const int TicksPerAction = 10;
+  static const int TicksPerAction = 15;
   
   Mob() = default;
   Mob(const MobInfo* info):info{info}{}

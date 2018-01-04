@@ -36,7 +36,7 @@ public:
 
 public:
   Window& window;
-  recti worldBounds {-32, 13, 64, 26};
+  recti worldBounds {-64, 24, 128, 48};
   ident player {invalid_id};
   vec2i cameraPosition {0, 0};
   vec2i cameraTarget {0, 0};

@@ -56,7 +56,7 @@
         var Module = {
             preRun: [],
             postRun: function(){
-                root = RootWindow(document.getElementById('terminal'), 60, 40);
+                root = RootWindow(document.getElementById('terminal'), 60, 40, 'Courier New');
             },
             onRuntimeInitialized: function() {                
                 Module.__setup();

@@ -23,44 +23,10 @@ inline std::string to_string(WindowEvent ev){
   }
 }
 
-#ifdef NO_WINDOW
-
-#include <iostream>
-#include <thread>
-
-class Window {
-public:
-  Window(){}
-  ~Window(){}
-  constexpr int32_t width() const  { return 256; }
-  constexpr int32_t height() const { return 128; }
-  
-  bool handleEvents() {
-    events_.clear();
-    static int i = 0;
-    static const std::vector<WindowEvent> evs {WindowEvent::ArrowUp,  WindowEvent::ArrowLeft, WindowEvent::ArrowDown, WindowEvent::ArrowRight};
-    events_.push_back(evs[(i++)%4]);
-    return true;
-  }
-  
-  const std::vector<WindowEvent>& events() const { return events_; }
-  
-  void render() {
-    std::cout << "Window::render()\n";
-    using namespace std::chrono_literals;
-    const auto delayPerFrame = 15ms;
-    if (delayPerFrame != 0ms){
-      std::this_thread::sleep_for(delayPerFrame);
-    }
-  }
-  
-  void clear() {}
-  void set(int x, int y, char c, uint16_t fg, uint16_t bg) {}
-protected:
-  std::vector<WindowEvent> events_;
-};
-
-#else
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#include <emscripten/html5.h>
+#endif
 
 class Window {
 public:
@@ -75,10 +41,15 @@ public:
   
   void clear();
   void set(int x, int y, char c, uint16_t fg, uint16_t bg);
+
+#ifdef __EMSCRIPTEN__
+  EM_BOOL emsKeyDownCallback(int eventType, const EmscriptenKeyboardEvent* e, void* userData);
+protected:
+  std::vector<WindowEvent> eventsBuffer_;
+#endif
+
 protected:
   std::vector<WindowEvent> events_;
 };
 
-#endif
-
-#endif /* window_hpp */
+#endif 

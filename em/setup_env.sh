@@ -1,0 +1,1 @@
+echo "run: source /Users/ben/lib/emsdk/emsdk_env.sh"

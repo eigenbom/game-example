@@ -1,2 +1,3 @@
-A simple example of a terminal-based game in c++.
+A roguelike game example in c++. Runs in terminal or browser. 
+
 

@@ -32,7 +32,9 @@ public:
     vec2i q {p.x - worldBounds.left, worldBounds.top - p.y};
     return groundTiles_(q);
   }
-  
+
+public:
+  Window& window;
   recti worldBounds {-32, 13, 64, 26};
   ident player {invalid_id};
   vec2i camera {0, 0};
@@ -47,13 +49,6 @@ public:
   buffered_container<Mob>     mobs;
   buffered_container<Sprite>  sprites;
   buffered_container<Physics> physics;
-  
-  Window& window;
-  
-  // Factories
-  Sprite& createSprite(std::string frames, bool animated, int frameRate, uint16_t fg, uint16_t bg, vec2i position, RenderLayer layer);
-  Mob& createMob(MobType type, vec2i position);
-  void createBloodSplatter(vec2i position);
   
 protected:
   int tick_ = 0;
@@ -76,10 +71,16 @@ protected:
     &physicsSystem_,
     &renderSystem_,
   };
-  
+
+  void sync();
   void handleInput();
   void handlePlayerInput();
-  void sync();
+  void updateCamera();
+  
+  // Factories
+  Sprite& createSprite(std::string frames, bool animated, int frameRate, uint16_t fg, uint16_t bg, vec2i position, RenderLayer layer);
+  Mob& createMob(MobType type, vec2i position);
+  void createBloodSplatter(vec2i position);
   
 };
 

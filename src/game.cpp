@@ -60,6 +60,7 @@ void Game::setup(){
 
 bool Game::update(){
   handleInput();
+  updateCamera(); // NB: Outside of world update
   
   const int subTicksPerTick = 3;
   if (subTick_-- == 0){
@@ -87,32 +88,9 @@ bool Game::update(){
         // Roughen flat ground
         if (c == '_' && randInt(0, 60) == 0) c = '.';
       }
-      
-      // Camera
-      if (cameraShake){
-        cameraShakeTimer++;
-        if (cameraShakeStrength == 1) cameraShakeTimer ++;
-        
-        if (cameraShakeTimer > 7){
-          cameraShake = false;
-          cameraShakeOffset = vec2i {0,0};
-          cameraShakeTimer = 0;
-        }
-        else if (cameraShakeTimer % 2 == 0){
-          if (cameraShakeStrength == 1){
-            if (randInt(0, 1) == 0){
-              cameraShakeOffset = vec2i {randInt(-1, 1), 0};
-            }
-            else {
-              cameraShakeOffset = vec2i {0, randInt(-1, 1)};
-            }
-          }
-          else {
-            cameraShakeOffset = vec2i {randInt(-1, 1), randInt(-1, 1)};
-          }
-        }
-      }
     }
+      
+    
   
     // Events
     auto& events = events_[eventsIndex_];
@@ -133,11 +111,11 @@ bool Game::update(){
         auto& sprite = sprites[e.sprite];
         queueEvent(EvRemove { mob.entity });
 
-        // TODO: screen-shake if visible
+        // TODO: screen-shake only if visible
         cameraShake = true;
         cameraShakeTimer = 0;
         cameraShakeStrength = 2;
-        freezeTimer = 3;
+        freezeTimer = 1;
         
         createBloodSplatter(mob.position);
         
@@ -180,7 +158,7 @@ bool Game::update(){
         cameraShake = true;
         cameraShakeTimer = 0;
         cameraShakeStrength = 1;
-        freezeTimer = 1;
+        freezeTimer = 0;
       }
       
       for (auto* sys: systems_){
@@ -453,4 +431,31 @@ void Game::handlePlayerInput(){
     }
   }
 }
+
+void Game::updateCamera() {
+  if (cameraShake){
+    cameraShakeTimer++;
+    if (cameraShakeStrength == 1) cameraShakeTimer ++;
+    
+    if (cameraShakeTimer > 7){
+      cameraShake = false;
+      cameraShakeOffset = vec2i {0,0};
+      cameraShakeTimer = 0;
+    }
+    else if (cameraShakeTimer % 2 == 0){
+      if (cameraShakeStrength == 1){
+        if (randInt(0, 1) == 0){
+          cameraShakeOffset = vec2i {randInt(-1, 1), 0};
+        }
+        else {
+          cameraShakeOffset = vec2i {0, randInt(-1, 1)};
+        }
+      }
+      else {
+        cameraShakeOffset = vec2i {randInt(-1, 1), randInt(-1, 1)};
+      }
+    }
+  }
+}
+
 

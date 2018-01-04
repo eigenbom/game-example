@@ -3,7 +3,7 @@
 #include "game.h"
 
 void RenderSystem::update(){
-  const int slowBy = 5;
+  const int slowBy = 2;
   static int slowDown = 0;
   bool updateAnimation = slowDown++ >= slowBy;
   if (updateAnimation) slowDown = 0;
@@ -16,6 +16,10 @@ void RenderSystem::update(){
           sprite.frame = (sprite.frame + 1) % sprite.frames.size();
           sprite.frameCounter = 0;
         }
+      }
+      
+      if (sprite.flashTimer > 0){
+        sprite.flashTimer--;
       }
     }
   }
@@ -38,9 +42,10 @@ void RenderSystem::render(){
     for (const auto& sprite: game_.sprites.values()){
       if (sprite.renderLayer == layer){
         vec2i p = sprite.position;
+        bool flash = sprite.flashTimer > 0;
         if (game_.worldBounds.contains(p)){
           vec2i sc = game_.screenCoord(p);
-          game_.window.set(sc.x, sc.y, sprite.frames[sprite.frame], sprite.fg, sprite.bg);
+          game_.window.set(sc.x, sc.y, sprite.frames[sprite.frame], flash ? TB_WHITE : sprite.fg, sprite.bg);
         }
       }
     }

@@ -37,8 +37,8 @@ inline std::string to_string(const ident& id){
   return std::string("#") + std::to_string(id.i_);
 }
 
-// Need a hash to use container
 namespace std {
+  // for std::unordered_map<id, ...>
   template <> struct hash<::ident>{
     size_t operator()(::ident i) const noexcept {
       return hash<uint32_t>()(i.i_);
@@ -109,6 +109,8 @@ std::string to_string(const container<T>& container) {
   return oss.str();
 }
 
+// a buffered, safer version of container
+// preserves references to elements until sync() is called
 template <typename T>
 class buffered_container: public container<T> {
   using super = container<T>;

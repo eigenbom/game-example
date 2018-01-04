@@ -54,10 +54,6 @@ struct MobInfo {
   int32_t health = 0;
   bool attacks = false;
   int32_t strength = 0;
-  
-  MobInfo() = default;
-  MobInfo(MobCategory category, std::string name, int32_t health):category(category), name(name), health(health) {}
-  MobInfo(MobCategory category, std::string name, int32_t health, int32_t strength):category(category), name(name), health(health), attacks(true), strength(strength){}
 };
 
 class Mob: public Component {

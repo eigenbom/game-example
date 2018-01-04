@@ -19,13 +19,20 @@ class Sprite: public Component {
 public:
   vec2i position {0, 0};
   RenderLayer renderLayer { RenderLayer::Ground };
-  std::string frames;
+  
+  // Colour
   uint16_t fg = TB_WHITE;
   uint16_t bg = TB_BLACK;
-  bool animated = false;
-  int frame = 0;
-  int frameRate = 1;
+  
+  // Animation
+  std::string frames {};
+  bool animated    = false;
+  int frame        = 0;
+  int frameRate    = 1;
   int frameCounter = 0;
+  
+  // Effects
+  int flashTimer   = 0;
   
   Sprite() = default;
   Sprite(std::string frames, bool animated, int frameRate, uint16_t fg, uint16_t bg, vec2i position, RenderLayer layer):frames(frames), position(position), animated(animated), frameRate(frameRate), fg(fg), bg(bg), renderLayer(layer) {

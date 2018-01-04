@@ -20,8 +20,18 @@
 class Game {
 public:
   Game(Window& window);
+  void setup();
+  void queueEvent(const EvAny& ev);
   bool update();
   void render();
+  
+  vec2i worldCoord(vec2i screenCoord) const; // Map screen point to world point
+  vec2i screenCoord(vec2i worldCoord) const; // Map world point to screen point
+  
+  char& groundTile(vec2i p){
+    vec2i q {p.x - worldBounds.left, worldBounds.top - p.y};
+    return groundTiles_(q);
+  }
   
   recti worldBounds {-32, 13, 64, 26};
   ident player {invalid_id};
@@ -29,47 +39,16 @@ public:
   
   bool cameraShake = false;
   int cameraShakeTimer = 0;
+  int cameraShakeStrength = 2;
   vec2i cameraShakeOffset {0, 0};
-  
-  // Map between coordinate-spaces
-  vec2i worldCoord(vec2i screenCoord) const {
-    const vec2i ws { window.width(), window.height() };
-    vec2i q = screenCoord - ws / 2;
-    vec2i camFinal = camera + (cameraShake ? cameraShakeOffset : vec2i {0, 0});
-    return { q.x + camFinal.x, -(q.y - camFinal.y) };
-  }
-  
-  vec2i screenCoord(vec2i worldCoord) const {
-    const vec2i ws { window.width(), window.height() };
-    vec2i wc = worldCoord;
-    vec2i camFinal = camera + (cameraShake ? cameraShakeOffset : vec2i {0, 0});
-    return vec2i {wc.x - camFinal.x, camFinal.y - wc.y} + ws / 2;
-  }
+  int freezeTimer = 0;
   
   buffered_container<Entity>  entities;
   buffered_container<Mob>     mobs;
   buffered_container<Sprite>  sprites;
   buffered_container<Physics> physics;
   
-  Array2D<char> groundTiles_;
-  char& groundTile(vec2i p){
-    vec2i q {p.x - worldBounds.left, worldBounds.top - p.y};
-    return groundTiles_(q);
-  }
-  
   Window& window;
-  
-  MobSystem mobSystem;
-  PhysicsSystem physicsSystem;
-  RenderSystem renderSystem;
-  std::vector<System*> systems {
-    &mobSystem,
-    &physicsSystem,
-    &renderSystem,
-  };
-  
-  void queueEvent(const EvAny& ev);
-  void sync();
   
   // Factories
   Sprite& createSprite(std::string frames, bool animated, int frameRate, uint16_t fg, uint16_t bg, vec2i position, RenderLayer layer);
@@ -78,11 +57,30 @@ public:
   
 protected:
   int tick_ = 0;
+  int subTick_ = 0;
   
   std::array<std::vector<EvAny>, 2> events_ {};
   int eventsIndex_ = 0;
 
   std::deque<std::pair<std::string, int>> eventLog_;
+  
+  Array2D<char> groundTiles_;
+  
+  std::deque<WindowEvent> windowEvents_;
+  
+  MobSystem mobSystem_;
+  PhysicsSystem physicsSystem_;
+  RenderSystem renderSystem_;
+  std::vector<System*> systems_ {
+    &mobSystem_,
+    &physicsSystem_,
+    &renderSystem_,
+  };
+  
+  void handleInput();
+  void handlePlayerInput();
+  void sync();
+  
 };
 
 #endif

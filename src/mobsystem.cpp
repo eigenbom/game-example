@@ -6,22 +6,36 @@
 #include <string>
 using namespace std::string_literals;
 
+MobInfo MI(MobCategory category, std::string name, int32_t health){
+  MobInfo mi;
+  mi.category = category;
+  mi.name = name;
+  mi.health = health;
+  return mi;
+}
+
+MobInfo MI(MobCategory category, std::string name, int32_t health, int32_t strength){
+  MobInfo mi;
+  mi.category = category;
+  mi.name = name;
+  mi.health = health;
+  mi.attacks = true;
+  mi.strength = strength;
+  return mi;
+}
+
 const std::unordered_map<MobType, MobInfo> MobDatabase {
-  { MobType::Unknown,    MobInfo { MobCategory::Unknown, "Unknown"s, 0 } },
-  { MobType::Rabbit,     MobInfo { MobCategory::Rabbit,  "Rabbit"s, 1 } },
-  { MobType::RabbitWere, MobInfo { MobCategory::Rabbit,  "Were-Rabbit"s, 1, 1 } },
-  { MobType::Snake,      MobInfo { MobCategory::Snake,   "Snake"s, 1 } },
-  { MobType::OrcWeak,    MobInfo { MobCategory::Orc,     "Little Orc"s, 5, 3 } },
-  { MobType::OrcStrong,  MobInfo { MobCategory::Orc,     "Big Orc"s, 6, 5 } },
-  { MobType::Player,     MobInfo { MobCategory::Player,  "Player"s, 5, 5 } },
+  { MobType::Unknown,    MI( MobCategory::Unknown, "Unknown"s, 0 ) },
+  { MobType::Rabbit,     MI( MobCategory::Rabbit,  "Rabbit"s, 1 ) },
+  { MobType::RabbitWere, MI( MobCategory::Rabbit,  "Were-Rabbit"s, 1, 1 ) },
+  { MobType::Snake,      MI( MobCategory::Snake,   "Snake"s, 1 ) },
+  { MobType::OrcWeak,    MI( MobCategory::Orc,     "Little Orc"s, 5, 3 ) },
+  { MobType::OrcStrong,  MI( MobCategory::Orc,     "Big Orc"s, 6, 5 ) },
+  { MobType::Player,     MI( MobCategory::Player,  "Player"s, 5, 5 ) },
 };
 
 void MobSystem::update(){
-  const int movementSlowDown = 3;
   static int movementTimer = 0;
-  static int subMovementTimer = 0;
-  if (subMovementTimer++ < movementSlowDown) return;
-  subMovementTimer = 0;
   movementTimer++;
   
   bool moveQuick  = movementTimer % 2 == 0;
@@ -148,8 +162,7 @@ void MobSystem::handleEvent(const EvAny& any) {
         default: break;
         case MobCategory::Snake: {
           if (randInt(0, 3) < 3){
-            char tracks [2] = {'_','_'};
-            game_.groundTile(mob.position) = tracks[abs(mob.dir.y)];
+            game_.groundTile(mob.position) = '_';
           }
           
           game_.sprites[mob.extraSprite].position = mob.position + mob.dir;
@@ -158,7 +171,7 @@ void MobSystem::handleEvent(const EvAny& any) {
         case MobCategory::Orc: {
           if (randInt(0, 1) == 0){
             // smash ground
-            game_.groundTile(mob.position) = choose({'_','_'});
+            game_.groundTile(mob.position) = '_';
           }
           game_.sprites[mob.extraSprite].position  = mob.position + vec2i{-1, 1};
           game_.sprites[mob.extraSprite2].position = mob.position + vec2i{1, 1};
@@ -171,5 +184,27 @@ void MobSystem::handleEvent(const EvAny& any) {
   }
   else if (any.is<EvWalked>()){
     // ...
+  }
+  else if (any.is<EvAttack>()){
+    const auto& ev = any.get<EvAttack>();
+    auto& mob = game_.mobs[ev.mob];
+    auto& mobInfo = *mob.info;
+    auto& targetMob = game_.mobs[ev.target];
+    // auto& targetMobInfo = *targetMob.info;
+    
+    if (mob && targetMob){
+      targetMob.health -= mobInfo.strength;
+      if (targetMob.health <= 0){
+        game_.queueEvent(EvKillMob {targetMob.id });
+      }
+      else {
+        // Flash-hit
+        const int flashDuration = 2;
+        auto& e = game_.entities[targetMob.entity];
+        game_.sprites[e.sprite].flashTimer = flashDuration;
+        if (targetMob.extraSprite)  game_.sprites[targetMob.extraSprite].flashTimer  = flashDuration;
+        if (targetMob.extraSprite2) game_.sprites[targetMob.extraSprite2].flashTimer = flashDuration;
+      }
+    }
   }
 }

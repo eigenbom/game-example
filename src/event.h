@@ -12,10 +12,19 @@
 struct EvRemove   { ident entity; };
 struct EvKillMob  { ident who; };
 struct EvSpawnMob { MobType type; vec2i position; };
+// Mob Actions
 struct EvTryWalk  { ident mob; vec2i from; vec2i to; };
 struct EvWalked   { ident mob; vec2i from; vec2i to; };
+struct EvAttack   { ident mob; ident target; };
 
-using  EvAny = variant<EvRemove, EvKillMob, EvSpawnMob, EvTryWalk, EvWalked>;
+using  EvAny = variant<
+  EvRemove,
+  EvKillMob,
+  EvSpawnMob,
+  EvTryWalk,
+  EvWalked,
+  EvAttack
+>;
 
 inline std::string to_string(const EvAny& any){
   std::ostringstream oss;
@@ -38,6 +47,10 @@ inline std::string to_string(const EvAny& any){
   else if (any.is<EvWalked>()){
     auto& ev = any.get<EvWalked>();
     oss << "EvWalked {" << to_string(ev.mob) << ", " << to_string(ev.from) << ", " << to_string(ev.to) << "}";
+  }
+  else if (any.is<EvAttack>()){
+    auto& ev = any.get<EvAttack>();
+    oss << "EvAttack {" << to_string(ev.mob) << ", " << to_string(ev.target) << "}";
   }
   return oss.str();
 }

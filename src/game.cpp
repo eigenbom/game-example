@@ -2,204 +2,251 @@
 
 #include "event.h"
 
-Game::Game(Window& window):window(window), mobSystem(*this), physicsSystem(*this), renderSystem(*this), groundTiles_(worldBounds.width, worldBounds.height, '.'){
+Game::Game(Window& window):window(window), mobSystem_(*this), physicsSystem_(*this), renderSystem_(*this), groundTiles_(worldBounds.width, worldBounds.height, '.'){
 }
 
-bool Game::update(){
-  // Map input to player commands
-  vec2i movePlayer {0, 0};
-  for (auto ev: window.events()){
-    switch (ev){
-      case WindowEvent::ArrowUp:
-        movePlayer = vec2i {0, 1};
-        break;
-      case WindowEvent::ArrowDown:
-        movePlayer = vec2i {0, -1};
-        break;
-      case WindowEvent::ArrowLeft:
-        movePlayer = vec2i {-1, 0};
-        break;
-      case WindowEvent::ArrowRight:
-        movePlayer = vec2i {1, 0};
-        break;
+void Game::setup(){
+  const auto& b = worldBounds;
+  
+  // Create player
+  auto& playerMob = createMob(MobType::Player, {0,0});
+  player = playerMob.entity;
+  camera = playerMob.position;
+  
+  // Setup terrain
+  groundTiles_.fill('.');
+  for (int x = b.left; x < b.left + b.width; x++){
+    for (int y = b.top - b.height + 1; y <= b.top; y++){
+      if (randInt(0, 6) == 0){
+        groundTile({x, y}) = choose({',','_',' '});
+      }
     }
   }
   
-  if (movePlayer != vec2i {0, 0}){
-    auto& entity = entities[player];
-    auto& mob = mobs[entity.mob];
-    vec2i oldPos = mob.position;
-    vec2i newPos = oldPos + movePlayer;
+  // Populate world with mobs
+  int numMobs = (int) (0.5 * sqrt(b.width * b.height));
+  for (int i=0; i<numMobs; i++){
+    MobType type = choose({MobType::Rabbit, MobType::OrcStrong}); //MobType::Snake, MobType::OrcStrong});
+    vec2i pos {
+      randInt(b.left, b.left + b.width - 1),
+      randInt(b.top - b.height + 1, b.top)
+    };
+    createMob(type, pos);
     
-    ident target = invalid_id;
-    for (auto& other: mobs.values()){
-      if (other.id != mob.id && other.position == newPos){
-        target = other.id;
-        break;
-      }
+    if (i % 32 == 0) sync();
+  }
+  
+  // Mob-less sprites
+  for (int i=0; i<numMobs / 2; i++){
+    vec2i pos {
+      randInt(b.left, b.left + b.width - 1),
+      randInt(b.top - b.height + 1, b.top)
+    };
+    if (randInt(0, 2) != 0){
+      createSprite("vV", true, 6, TB_MAGENTA, TB_BLACK, pos, RenderLayer::GroundCover);
     }
-    
-    if (target){
-      queueEvent(EvKillMob {target} );
-      
-      cameraShake = true;
-      cameraShakeTimer = 0;
+    else if (randInt(0, 1) == 0){
+      createSprite("|/-\\", true, 2, TB_YELLOW, TB_BLACK, pos, RenderLayer::GroundCover);
     }
     else {
-      queueEvent(EvTryWalk {mob.id, oldPos, newPos});
-    }
-  }
-  
-  for (auto* sys: systems){
-    sys->update();
-  }
-  
-  for (auto& e: entities.values()){
-    e.age++;
-    if (e.life > 0 && e.age >= e.life){
-      queueEvent(EvRemove {e.id} );
-    }
-  }
-  
-  // Dirt system
-  for (auto& c: groundTiles_.data()){
-    // Roughen flat ground
-    if (c == '_' && randInt(0, 30) == 0) c = '.';
-  }
-  
-  // Camera
-  if (cameraShake){
-    cameraShakeTimer++;
-    if (cameraShakeTimer > 7){
-      cameraShake = false;
-      cameraShakeOffset = vec2i {0,0};
-      cameraShakeTimer = 0;
-    }
-    else if (cameraShakeTimer % 2 == 0){      
-      cameraShakeOffset = vec2i {randInt(-1, 1), randInt(-1, 1)};
-    }
-  }
-  
-  // Events
-  auto& events = events_[eventsIndex_];
-  eventsIndex_ = 1 - eventsIndex_; // toggle buffer
-  std::vector<ident> remove;
-  
-  for (const EvAny& any: events){
-    eventLog_.push_back({to_string(any), tick_});
-    
-    if (any.is<EvRemove>()){
-      const auto& ev = any.get<EvRemove>();
-      remove.push_back({ ev.entity });
-    }
-    else if (any.is<EvKillMob>()){
-      const auto& ev = any.get<EvKillMob>();
-      Mob& mob = mobs[ev.who];
-      auto& e = entities[mob.entity];
-      auto& sprite = sprites[e.sprite];
-      queueEvent(EvRemove { mob.entity });
-
-      createBloodSplatter(mob.position);
-      
-      {
-        // Bones
-        auto& spr = createSprite(std::string(1, sprite.frames[sprite.frame]), false, 0, TB_RED, TB_BLACK, mob.position, RenderLayer::Ground);
-        auto& e = entities[spr.entity];
-        e.life = randInt(100, 110);
-      }
-    }
-    else if (any.is<EvSpawnMob>()){
-      const auto& ev = any.get<EvSpawnMob>();
-      createMob(ev.type, ev.position);
-    }
-    else if (any.is<EvTryWalk>()){
-      // const auto& ev = any.get<EvTryWalk>();
-      // ...
-    }
-    else if (any.is<EvWalked>()){
-      const auto& ev = any.get<EvWalked>();
-      if (ev.mob == entities[player].mob){
-        // Camera tracks player
-        const vec2i margin { 8, 4 };
-        vec2i newScreenPos = screenCoord(ev.to);
-        if ((window.width() - newScreenPos.x) < margin.x){
-          camera.x += margin.x;
-        }
-        else if (newScreenPos.x < margin.x){
-          camera.x -= margin.x;
-        }
-        else if ((window.height() - newScreenPos.y) < margin.y){
-          camera.y -= margin.y;
-        }
-        else if (newScreenPos.y < margin.y){
-          camera.y += margin.y;
-        }
-      }
+      createSprite("Xx", true, 1, TB_BLUE, TB_BLACK, pos, RenderLayer::GroundCover);
     }
     
-    for (auto* sys: systems){
-      sys->handleEvent(any);
-    }
-  }
-  events.clear();
-  
-  auto it = remove.begin();
-  while (it != remove.end()){
-    const ident& id = *it;
-    Entity& e = entities[id];
-    if (!e){
-      ++it;
-      continue; // Already removed
-    }
-    
-    using cid = std::pair<ComponentType, ident>;
-    auto comps = {
-      cid {ComponentType::Mob,     e.mob},
-      cid {ComponentType::Sprite,  e.sprite},
-      cid {ComponentType::Physics, e.physics}
-    };
-    
-    for (auto pair: comps){
-      ident component = pair.second;
-      if (component){
-        ComponentType type = pair.first;
-        
-        switch (type){
-          default: break;
-          case ComponentType::Mob: {
-            mobs.remove(component);
-            break;
-          }
-          case ComponentType::Sprite: {
-            sprites.remove(component);
-            break;
-          }
-          case ComponentType::Physics: {
-            physics.remove(component);
-            break;
-          }
-        }
-      }
-    }
-    
-    for (const auto& ch: e.children){
-      queueEvent( EvRemove {ch} );
-    }
-    e.children.clear();
-    
-    entities.remove(id);
-    it++;
+    if (i % 32 == 0) sync();
   }
   
   sync();
-  tick_++;
+}
+
+bool Game::update(){
+  handleInput();
   
-  while (!eventLog_.empty()){
-    const auto& pair = eventLog_.front();
-    if (tick_ > pair.second + 20){
-      eventLog_.pop_front();
+  const int subTicksPerTick = 3;
+  if (subTick_-- == 0){
+    subTick_ = subTicksPerTick;
+  
+    if (freezeTimer > 0) freezeTimer--;
+    bool updateWorld = (freezeTimer == 0);
+
+    if (updateWorld){
+      handlePlayerInput();
+      
+      for (auto* sys: systems_){
+        sys->update();
+      }
+     
+      for (auto& e: entities.values()){
+        e.age++;
+        if (e.life > 0 && e.age >= e.life){
+          queueEvent(EvRemove {e.id} );
+        }
+      }
+      
+      // Dirt system
+      for (auto& c: groundTiles_.data()){
+        // Roughen flat ground
+        if (c == '_' && randInt(0, 60) == 0) c = '.';
+      }
+      
+      // Camera
+      if (cameraShake){
+        cameraShakeTimer++;
+        if (cameraShakeStrength == 1) cameraShakeTimer ++;
+        
+        if (cameraShakeTimer > 7){
+          cameraShake = false;
+          cameraShakeOffset = vec2i {0,0};
+          cameraShakeTimer = 0;
+        }
+        else if (cameraShakeTimer % 2 == 0){
+          if (cameraShakeStrength == 1){
+            if (randInt(0, 1) == 0){
+              cameraShakeOffset = vec2i {randInt(-1, 1), 0};
+            }
+            else {
+              cameraShakeOffset = vec2i {0, randInt(-1, 1)};
+            }
+          }
+          else {
+            cameraShakeOffset = vec2i {randInt(-1, 1), randInt(-1, 1)};
+          }
+        }
+      }
     }
-    else break;
+  
+    // Events
+    auto& events = events_[eventsIndex_];
+    eventsIndex_ = 1 - eventsIndex_; // toggle buffer
+    std::vector<ident> remove;
+    
+    for (const EvAny& any: events){
+      eventLog_.push_back({to_string(any), tick_});
+      
+      if (any.is<EvRemove>()){
+        const auto& ev = any.get<EvRemove>();
+        remove.push_back({ ev.entity });
+      }
+      else if (any.is<EvKillMob>()){
+        const auto& ev = any.get<EvKillMob>();
+        Mob& mob = mobs[ev.who];
+        auto& e = entities[mob.entity];
+        auto& sprite = sprites[e.sprite];
+        queueEvent(EvRemove { mob.entity });
+
+        // TODO: screen-shake if visible
+        cameraShake = true;
+        cameraShakeTimer = 0;
+        cameraShakeStrength = 2;
+        freezeTimer = 3;
+        
+        createBloodSplatter(mob.position);
+        
+        {
+          // Bones
+          auto& spr = createSprite(std::string(1, sprite.frames[sprite.frame]), false, 0, TB_RED, TB_BLACK, mob.position, RenderLayer::Ground);
+          auto& e = entities[spr.entity];
+          e.life = randInt(100, 110);
+        }
+      }
+      else if (any.is<EvSpawnMob>()){
+        const auto& ev = any.get<EvSpawnMob>();
+        createMob(ev.type, ev.position);
+      }
+      else if (any.is<EvTryWalk>()){
+        // const auto& ev = any.get<EvTryWalk>();
+        // ...
+      }
+      else if (any.is<EvWalked>()){
+        const auto& ev = any.get<EvWalked>();
+        if (ev.mob == entities[player].mob){
+          // Camera tracks player
+          const vec2i margin { 8, 4 };
+          vec2i newScreenPos = screenCoord(ev.to);
+          if ((window.width() - newScreenPos.x) < margin.x){
+            camera.x += margin.x;
+          }
+          else if (newScreenPos.x < margin.x){
+            camera.x -= margin.x;
+          }
+          else if ((window.height() - newScreenPos.y) < margin.y){
+            camera.y -= margin.y;
+          }
+          else if (newScreenPos.y < margin.y){
+            camera.y += margin.y;
+          }
+        }
+      }
+      else if (any.is<EvAttack>()){
+        cameraShake = true;
+        cameraShakeTimer = 0;
+        cameraShakeStrength = 1;
+        freezeTimer = 1;
+      }
+      
+      for (auto* sys: systems_){
+        sys->handleEvent(any);
+      }
+    }
+    events.clear();
+    
+    auto it = remove.begin();
+    while (it != remove.end()){
+      const ident& id = *it;
+      Entity& e = entities[id];
+      if (!e){
+        ++it;
+        continue; // Already removed
+      }
+      
+      using cid = std::pair<ComponentType, ident>;
+      auto comps = {
+        cid {ComponentType::Mob,     e.mob},
+        cid {ComponentType::Sprite,  e.sprite},
+        cid {ComponentType::Physics, e.physics}
+      };
+      
+      for (auto pair: comps){
+        ident component = pair.second;
+        if (component){
+          ComponentType type = pair.first;
+          
+          switch (type){
+            default: break;
+            case ComponentType::Mob: {
+              mobs.remove(component);
+              break;
+            }
+            case ComponentType::Sprite: {
+              sprites.remove(component);
+              break;
+            }
+            case ComponentType::Physics: {
+              physics.remove(component);
+              break;
+            }
+          }
+        }
+      }
+      
+      for (const auto& ch: e.children){
+        queueEvent( EvRemove {ch} );
+      }
+      e.children.clear();
+      
+      entities.remove(id);
+      it++;
+    }
+    
+    sync();
+    tick_++;
+    
+    while (!eventLog_.empty()){
+      const auto& pair = eventLog_.front();
+      if (tick_ > pair.second + 20){
+        eventLog_.pop_front();
+      }
+      else break;
+    }
   }
   
   return true;
@@ -207,7 +254,7 @@ bool Game::update(){
 
 void Game::render(){
   window.clear();
-  renderSystem.render();
+  renderSystem_.render();
   
   const bool logEvents = false;
   if (logEvents){
@@ -228,6 +275,20 @@ void Game::render(){
     }
 #endif
   }
+}
+
+vec2i Game::worldCoord(vec2i screenCoord) const {
+  const vec2i ws { window.width(), window.height() };
+  vec2i q = screenCoord - ws / 2;
+  vec2i camFinal = camera + (cameraShake ? cameraShakeOffset : vec2i {0, 0});
+  return { q.x + camFinal.x, -(q.y - camFinal.y) };
+}
+
+vec2i Game::screenCoord(vec2i worldCoord) const {
+  const vec2i ws { window.width(), window.height() };
+  vec2i wc = worldCoord;
+  vec2i camFinal = camera + (cameraShake ? cameraShakeOffset : vec2i {0, 0});
+  return vec2i {wc.x - camFinal.x, camFinal.y - wc.y} + ws / 2;
 }
 
 void Game::queueEvent(const EvAny &ev){
@@ -340,4 +401,56 @@ void Game::createBloodSplatter(vec2i position){
   }
 }
 
+void Game::handleInput(){
+  for (auto ev: window.events()){
+    windowEvents_.push_back(ev);
+  }
+}
+
+void Game::handlePlayerInput(){
+  // Map input to player commands
+  vec2i movePlayer {0, 0};
+  
+  while (!windowEvents_.empty()){
+    const auto& ev = windowEvents_.front();
+    windowEvents_.pop_front();
+    
+    switch (ev){
+      case WindowEvent::ArrowUp:
+        movePlayer = vec2i {0, 1};
+        break;
+      case WindowEvent::ArrowDown:
+        movePlayer = vec2i {0, -1};
+        break;
+      case WindowEvent::ArrowLeft:
+        movePlayer = vec2i {-1, 0};
+        break;
+      case WindowEvent::ArrowRight:
+        movePlayer = vec2i {1, 0};
+        break;
+    }
+  }
+  
+  if (movePlayer != vec2i {0, 0}){
+    auto& entity = entities[player];
+    auto& mob = mobs[entity.mob];
+    vec2i oldPos = mob.position;
+    vec2i newPos = oldPos + movePlayer;
+    
+    ident target = invalid_id;
+    for (auto& other: mobs.values()){
+      if (other.id != mob.id && other.position == newPos){
+        target = other.id;
+        break;
+      }
+    }
+    
+    if (target){
+      queueEvent(EvAttack {mob.id, target} );
+    }
+    else {
+      queueEvent(EvTryWalk {mob.id, oldPos, newPos});
+    }
+  }
+}
 
